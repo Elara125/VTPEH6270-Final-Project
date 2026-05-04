@@ -1,0 +1,2 @@
+n_observations,n_counties,start_date,end_date,mean_tests,median_tests,sd_tests,mean_new_positives,median_new_positives,sd_new_positives
+17666,73,2023-01-01,2023-08-30,1041.7358202196308,90,4341.0648853945895,50.39001471753651,5,225.35345559580915

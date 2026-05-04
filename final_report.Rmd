@@ -1,0 +1,262 @@
+---
+title: "COVID-19 Testing Volume and Newly Reported Positive Cases in New York State Counties, 2023"
+author: "Jiaru Wei"
+date: "05/03/2026"
+output:
+  pdf_document:
+    toc: true
+    number_sections: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  warning = FALSE,
+  message = FALSE,
+  fig.width = 7,
+  fig.height = 5
+)
+
+library(tidyverse)
+library(here)
+library(broom)
+library(knitr)
+```
+
+# Introduction
+
+COVID-19 testing is an important part of public health surveillance because it helps identify infections and monitor disease trends across communities. Areas with higher testing volume may report more positive cases because more infections are detected. However, reported case counts can also be influenced by population size, testing access, local transmission patterns, and differences in health care access.
+
+This report examines the association between COVID-19 testing volume and newly reported positive cases across New York State counties in 2023.
+
+The research question is:
+
+**Is COVID-19 testing volume associated with newly reported positive cases across New York State counties in 2023?**
+
+The expected relationship is positive: county-date observations with more tests performed are expected to have more newly reported positive cases.
+
+# Material & Methods
+
+## Data Source
+
+The dataset used in this report is the New York State Department of Health statewide COVID-19 testing dataset. The data include county-level COVID-19 testing records, including test date, county, newly reported positive cases, and total number of tests performed.
+
+The analysis was limited to observations from 2023. Although the research question focuses on 2023, the available dataset used for this analysis contained records from January 1, 2023 through August 30, 2023. Therefore, the results should be interpreted as reflecting the available 2023 observation period rather than the full calendar year.
+
+## Variables
+
+The main outcome variable was **newly reported positive COVID-19 cases**, measured as the number of new positives reported for a county on a given test date.
+
+The main explanatory variable was **COVID-19 testing volume**, measured as the total number of tests performed for a county on a given test date.
+
+## Data Cleaning
+
+```{r data-cleaning}
+covid_raw <- read_csv(
+  here("data", "raw", "NYS_Statewide_COVID-19_Testing_2023.csv")
+)
+
+covid_clean <- covid_raw %>%
+  janitor::clean_names()
+
+covid_analysis <- covid_clean %>%
+  select(
+    test_date,
+    county,
+    new_positives,
+    total_number_of_tests_performed
+  ) %>%
+  mutate(
+    test_date = as.Date(test_date, format = "%m/%d/%Y"),
+    new_positives = as.numeric(new_positives),
+    total_number_of_tests_performed = as.numeric(
+      gsub(",", "", total_number_of_tests_performed)
+    )
+  ) %>%
+  filter(
+    test_date >= as.Date("2023-01-01"),
+    test_date <= as.Date("2023-12-31"),
+    !is.na(test_date),
+    !is.na(new_positives),
+    !is.na(total_number_of_tests_performed),
+    total_number_of_tests_performed >= 0,
+    new_positives >= 0
+  )
+
+glimpse(covid_analysis)
+```
+
+## Statistical Analysis
+
+Descriptive statistics were calculated for testing volume and newly reported positive cases. A scatterplot with a linear regression line was used to visually examine the association between testing volume and new positive cases.
+
+A simple linear regression model was then fitted with newly reported positive cases as the outcome and total number of tests performed as the explanatory variable:
+
+\[
+New\ Positives = \beta_0 + \beta_1(Total\ Tests) + \epsilon
+\]
+
+A Spearman correlation test was also used because the variables were highly skewed and included extreme values. Model diagnostics were examined using residual plots to assess whether the linear regression model was appropriate.
+
+# Results
+
+## Descriptive Statistics
+
+```{r descriptive-statistics}
+summary_table_long <- tibble(
+  Statistic = c(
+    "Number of observations",
+    "Number of counties",
+    "Start date",
+    "End date",
+    "Mean tests",
+    "Median tests",
+    "SD of tests",
+    "Mean new positives",
+    "Median new positives",
+    "SD of new positives"
+  ),
+  Value = c(
+    nrow(covid_analysis),
+    n_distinct(covid_analysis$county),
+    as.character(min(covid_analysis$test_date)),
+    as.character(max(covid_analysis$test_date)),
+    round(mean(covid_analysis$total_number_of_tests_performed, na.rm = TRUE), 2),
+    round(median(covid_analysis$total_number_of_tests_performed, na.rm = TRUE), 2),
+    round(sd(covid_analysis$total_number_of_tests_performed, na.rm = TRUE), 2),
+    round(mean(covid_analysis$new_positives, na.rm = TRUE), 2),
+    round(median(covid_analysis$new_positives, na.rm = TRUE), 2),
+    round(sd(covid_analysis$new_positives, na.rm = TRUE), 2)
+  )
+)
+
+kable(summary_table_long, caption = "Descriptive statistics for COVID-19 testing volume and new positive cases.")
+```
+
+The analytic dataset included county-level COVID-19 testing observations from 2023. Testing volume and new positive case counts were both right-skewed, meaning that most county-date observations had relatively low values, while a smaller number of observations had much higher testing volume or case counts.
+
+## Visualization
+
+```{r scatterplot}
+scatter_plot <- ggplot(
+  covid_analysis,
+  aes(
+    x = total_number_of_tests_performed,
+    y = new_positives
+  )
+) +
+  geom_point(alpha = 0.35) +
+  geom_smooth(method = "lm", se = TRUE) +
+  labs(
+    title = "Association Between COVID-19 Testing Volume and New Positive Cases",
+    subtitle = "New York State counties, 2023",
+    x = "Total Number of Tests Performed",
+    y = "New Positive Cases",
+    caption = "Data source: New York State Department of Health COVID-19 testing data."
+  ) +
+  theme_minimal()
+
+scatter_plot
+```
+
+The scatterplot shows a positive association between testing volume and newly reported positive cases. County-date observations with higher testing volume generally reported more positive cases. However, the spread of points becomes wider at higher testing levels, suggesting that testing volume alone does not fully explain variation in reported positive cases.
+
+## Linear Regression Analysis
+
+```{r regression-model}
+model <- lm(
+  new_positives ~ total_number_of_tests_performed,
+  data = covid_analysis
+)
+
+summary(model)
+```
+
+```{r regression-table}
+regression_results <- tidy(model) %>%
+  mutate(
+    term = recode(
+      term,
+      "(Intercept)" = "Intercept",
+      "total_number_of_tests_performed" = "Total tests performed"
+    ),
+    estimate = round(estimate, 3),
+    std.error = round(std.error, 3),
+    statistic = round(statistic, 2),
+    p.value = ifelse(p.value < 0.001, "<0.001", round(p.value, 3))
+  )
+
+kable(
+  regression_results,
+  col.names = c("Term", "Estimate", "Standard Error", "t statistic", "p-value"),
+  caption = "Linear regression results."
+)
+
+model_fit <- glance(model) %>%
+  transmute(
+    `R-squared` = round(r.squared, 3),
+    `Adjusted R-squared` = round(adj.r.squared, 3),
+    `Residual standard error` = round(sigma, 2),
+    `F statistic` = round(statistic, 2),
+    `p-value` = ifelse(p.value < 0.001, "<0.001", round(p.value, 3)),
+    `Sample size` = nobs
+  )
+
+kable(
+  model_fit,
+  caption = "Model fit statistics."
+)
+```
+
+The linear regression model estimated the association between total tests performed and newly reported positive cases. The regression coefficient for total tests performed was 0.044, meaning that each additional test was associated with approximately 0.044 additional newly reported positive cases on average. Put another way, 100 additional tests were associated with about 4.4 additional reported positive cases. This association was statistically significant (p < 0.001). The model explained about 72.3% of the variation in newly reported positive cases, suggesting that testing volume was strongly associated with reported case counts in this dataset.
+
+Because this is an observational analysis, the regression result should be interpreted as an association rather than evidence that testing volume causes more cases.
+
+## Correlation Analysis
+
+```{r correlation}
+correlation_result <- cor.test(
+  covid_analysis$total_number_of_tests_performed,
+  covid_analysis$new_positives,
+  method = "spearman"
+)
+
+correlation_result
+```
+
+The Spearman correlation was strong and positive (rho = 0.900, p < 0.001), indicating that county-date observations with higher testing volume also tended to have higher newly reported positive case counts. This supports the regression finding while using a rank-based method that is less sensitive to skewed distributions and extreme values.
+
+## Model Diagnostics
+
+```{r model-diagnostics, fig.width=7, fig.height=7}
+par(mfrow = c(2, 2))
+plot(model)
+```
+
+The diagnostic plots suggest that the linear model captures the overall positive relationship between testing volume and new positive cases. However, the residuals are not evenly distributed across all fitted values, and the Q-Q plot shows deviation from normality at the tails. This suggests possible heteroscedasticity and the influence of extreme observations. Therefore, the model should be interpreted cautiously as evidence of an association, not as a precise predictive model.
+
+# Conclusions
+
+This analysis found a positive association between COVID-19 testing volume and newly reported positive cases across New York State counties in 2023. The findings are consistent with the expectation that areas or dates with more testing tend to identify more positive cases.
+
+However, this association should not be interpreted as causal. Higher testing volume may reflect larger populations, greater local transmission, better testing access, or targeted testing during outbreaks. The diagnostic plots also suggest that the simple linear model does not fully capture all variation in the data.
+
+Overall, the results show that testing volume is an important factor to consider when interpreting COVID-19 case counts. Future analyses could improve this work by adjusting for county population size, examining positivity rates, or comparing patterns across counties over time.
+
+# Reproducibility
+
+All code and data files for this report are available in the GitHub repository:
+
+https://github.com/Elara125/VTPEH6270-Final-Project
+
+The Shiny app for this project is available here:
+
+The Shiny app link will be added after deployment.
+
+# AI Use Disclosure Statement
+
+AI-based tools were used to help organize the report structure, debug R code, and improve wording. All data analysis decisions, interpretation of results, and final edits were reviewed by the author.
+
+# References
+
+New York State Department of Health. Statewide COVID-19 Testing Data. Health Data NY. Accessed May 2026. https://health.data.ny.gov/
