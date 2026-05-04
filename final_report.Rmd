@@ -251,7 +251,7 @@ https://github.com/Elara125/VTPEH6270-Final-Project
 
 The Shiny app for this project is available here:
 
-The Shiny app link will be added after deployment.
+[COVID-19 Testing and Positive Cases Shiny App](https://elara125.shinyapps.io/COVID19TestingApp/)
 
 # AI Use Disclosure Statement
 

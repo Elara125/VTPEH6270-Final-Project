@@ -87,7 +87,7 @@ The final report is available as:
 
 ## Shiny App
 
-The Shiny app link will be added after deployment.
+[COVID-19 Testing and Positive Cases Shiny App](https://elara125.shinyapps.io/COVID19TestingApp/)
 
 ## Reproducibility
 
